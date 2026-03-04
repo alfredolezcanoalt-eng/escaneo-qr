@@ -1,0 +1,2 @@
+# escaneo-qr
+escaneo-qr
