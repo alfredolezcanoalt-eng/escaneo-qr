@@ -98,7 +98,7 @@ async function cargarEquipos() {
   if(equipos && Array.isArray(equipos)) {
     const confs = {
       "ROJO":{bg:"#FF0000",txt:"#FFF"},"LILA":{bg:"#C8A2C8",txt:"#000"},"BLANCO":{bg:"#FFF",txt:"#000"},
-      "AMARILLO":{bg:"#FFD700",txt:"#000"},"NARANJA":{bg:"#FF8C00",txt:"#FFF"},"AZUL":{bg:"#0000FF",txt:"#FFF"},
+      "AMARILLO":{bg:"#FFD700",txt:"#000"},"NARANJA":{bg:"#FF8C00",txt:"#FFF"},"CELESTE":{bg:"#00BFFF",txt:"#000"},
       "VERDE":{bg:"#008000",txt:"#FFF"},"MARRON":{bg:"#8B4513",txt:"#FFF"}
     };
     cont.innerHTML = "";
