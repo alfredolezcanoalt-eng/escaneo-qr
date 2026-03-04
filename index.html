@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner QR Pro</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f2f5; margin: 0; padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        #reader { width: 100%; border-radius: 10px; overflow: hidden; }
+        #status { margin-top: 15px; padding: 10px; font-weight: bold; border-radius: 5px; }
+        .loading { color: #856404; background: #fff3cd; }
+        .success { color: #155724; background: #d4edda; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Escanear Código</h2>
+    <div id="reader"></div>
+    <div id="status">Esperando cámara...</div>
+</div>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyEfqPcAQHcjXTKf2eAmrxxdPC6DY9onNfp9cVw8_sLIC1lVjE1WmSAMCk-GDp-oE9y/exec"; 
+
+    function onScanSuccess(decodedText) {
+        // Pausar el escaneo
+        html5QrcodeScanner.clear();
+        const statusDiv = document.getElementById('status');
+        statusDiv.className = "status loading";
+        statusDiv.innerText = "Enviando: " + decodedText;
+
+        // Enviar a Google Sheets vía POST
+        fetch(WEB_APP_URL, {
+            method: 'POST',
+            mode: 'no-cors', // Importante para evitar bloqueos de navegador
+            body: JSON.stringify({ qr: decodedText })
+        })
+        .then(() => {
+            statusDiv.className = "status success";
+            statusDiv.innerText = "✅ ¡Registrado con éxito!";
+            // Reiniciar escáner tras 2 segundos
+            setTimeout(() => { location.reload(); }, 2000);
+        })
+        .catch(err => {
+            alert("Error al conectar con Google: " + err);
+            location.reload();
+        });
+    }
+
+    let html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", { fps: 10, qrbox: 250 }
+    );
+    html5QrcodeScanner.render(onScanSuccess);
+</script>
+</body>
+</html>
