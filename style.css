@@ -1,0 +1,250 @@
+/* =========================================
+   DISEÑO BASE Y FONDOS
+   ========================================= */
+body { 
+  background-color: #111; 
+  transition: background 0.8s ease; 
+  font-family: 'Arial Black', sans-serif; 
+  min-height: 100vh;
+  background-attachment: fixed;
+  margin: 0;
+  padding: 0;
+}
+
+/* =========================================
+   ESTRUCTURA Y VISTAS PRINCIPALES
+   ========================================= */
+#vista-equipos { 
+  height: 100vh; 
+  display: flex; 
+  flex-direction: column; 
+  padding: 10px; 
+}
+
+#contenedor-botones { 
+  flex-grow: 1; 
+  display: grid; 
+  grid-template-columns: repeat(2, 1fr); 
+  grid-template-rows: repeat(4, 1fr); 
+  gap: 10px; 
+  margin-top: 10px; 
+}
+
+#pantalla-pista, #pantalla-acertijo { 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  align-items: center; 
+  min-height: 65vh; 
+  padding: 10px 15px; 
+}
+
+/* =========================================
+   DISEÑO PREMIUM (GLASSMORPHISM)
+   ========================================= */
+.glass-card {
+  background: rgba(20, 20, 20, 0.4);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 25px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  padding: 30px 20px;
+  width: 100%;
+  animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pista-texto-premium {
+  font-size: 1.6rem;
+  line-height: 1.4;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0px 2px 4px rgba(0,0,0,0.6);
+  text-align: center;
+  max-height: 55vh;
+  overflow-y: auto;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.titulo-mision {
+  font-size: 0.75rem;
+  letter-spacing: 3px;
+  color: #f1c40f; 
+  font-weight: 900;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 15px;
+  opacity: 0.9;
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================
+   BOTONES DE EQUIPO (EFECTO 3D / CRISTAL)
+   ========================================= */
+.btn-equipo-gigante {
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgba(255,255,255,0.2) !important;
+  border-radius: 22px;
+  font-weight: 900 !important;
+  font-size: 1.4rem !important;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.5), inset 0 4px 8px rgba(255,255,255,0.4) !important;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-equipo-gigante:active { 
+  transform: scale(0.92) translateY(4px); 
+  box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+
+/* =========================================
+   BARRA DE PROGRESO Y COMPONENTES EXTRAS
+   ========================================= */
+.progreso-container { 
+  background: rgba(0,0,0,0.5); 
+  padding: 12px; 
+  border-radius: 0 0 15px 15px; 
+  margin-bottom: 15px; 
+}
+
+.progress { 
+  height: 18px; 
+  background-color: rgba(255,255,255,0.1); 
+  border-radius: 10px; 
+}
+
+.loader-container { 
+  display: none; 
+  margin-top: 20px; 
+}
+
+.input-acceso { 
+  background-color: #fff !important; 
+  color: #000 !important; 
+  border: 4px solid #333 !important; 
+  font-weight: 900 !important; 
+  text-transform: uppercase; 
+}
+
+.card { 
+  border-radius: 25px; 
+  background-color: rgba(255, 255, 255, 0.92); 
+  color: #000; 
+}
+
+/* =========================================
+   BOTÓN FLOTANTE DE ESCANEO (FAB)
+   ========================================= */
+.contenedor-qr-accion { 
+  position: fixed; 
+  bottom: 30px; 
+  right: 20px; 
+  z-index: 1000; 
+}
+
+.btn-scan-circular { 
+  width: 70px; 
+  height: 70px; 
+  background: #fff; 
+  border: 4px solid #222; 
+  border-radius: 50%; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5); 
+  transition: transform 0.2s; 
+}
+
+.btn-scan-circular:active { 
+  transform: scale(0.9); 
+}
+
+.icon-cam { 
+  font-size: 30px; 
+  animation: pulse-scanner 2s infinite; 
+}
+
+.label-estacion-flotante {
+  position: absolute; 
+  top: -10px; 
+  right: 0; 
+  background: #e74c3c; 
+  color: white;
+  font-size: 0.7rem; 
+  padding: 2px 8px; 
+  border-radius: 10px; 
+  font-weight: bold; 
+  border: 2px solid #222;
+}
+
+@keyframes pulse-scanner { 
+  0% { opacity: 1; } 
+  50% { opacity: 0.5; } 
+  100% { opacity: 1; } 
+}
+
+#reader { 
+  background: #000; 
+  min-height: 350px; 
+}
+
+/* =========================================
+   PANTALLA FINAL DEL TESORO (PERGAMINO)
+   ========================================= */
+.bg-parchment {
+  background-color: #f4e4bc;
+  background-image: url("https://www.transparenttextures.com/patterns/old-map.png");
+  border: 10px solid #8b4513;
+  color: #4b2e12;
+}
+
+.text-brown { color: #5d3a1a; }
+.btn-brown { background-color: #5d3a1a; color: #fff; }
+.treasure-icon { font-size: 80px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.3)); }
+.bg-light-transparent { background: rgba(255, 255, 255, 0.4); border: 1px dashed #5d3a1a; }
+
+/* =========================================
+   MODAL DE ALERTA PERSONALIZADO
+   ========================================= */
+.modal-personalizado {
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%;
+  background: rgba(0,0,0,0.85); 
+  z-index: 10000;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  padding: 20px;
+}
+
+.alerta-contenido {
+  background: white; 
+  color: black; 
+  padding: 30px; 
+  border-radius: 20px;
+  text-align: center; 
+  border: 4px solid #333; 
+  max-width: 400px; 
+  width: 100%;
+}
+
+.alerta-contenido p { 
+  font-size: 1.2rem; 
+  font-weight: bold; 
+  margin-bottom: 20px; 
+}
+
+.fixed-bottom { z-index: 1050; }
