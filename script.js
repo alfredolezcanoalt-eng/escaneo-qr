@@ -23,24 +23,56 @@ async function llamarAPI(datos) {
     
     const jsonRespuesta = await response.json();
     
-    // --- NUEVO: INTERCEPTOR DE BLOQUEO GLOBAL ---
-    // Si el servidor nos avisa que el juego terminó, disparamos la pantalla de bloqueo
+    // Si el servidor detecta que el equipo terminó o el juego cerró
     if (jsonRespuesta.juegoFinalizado) {
       bloquearJuegoFinalizado();
+      return { exito: false, juegoFinalizado: true }; 
     }
-    // --------------------------------------------
 
     return jsonRespuesta;
   } catch (error) {
     console.error("Error en conexión:", error);
-    // No mostramos alerta intrusiva si falla en background para no interrumpir el flujo optimista
     return { exito: false, error: error.message };
   }
 }
 
-// --- NUEVO: FUNCIÓN PARA BLOQUEAR UI ---
 function bloquearJuegoFinalizado() {
-  document.getElementById('pantalla-bloqueo-global').style.display = 'flex';
+  // Aseguramos que la pantalla de bloqueo sea visible y cubra todo
+  const bloqueo = document.getElementById('pantalla-bloqueo-global');
+  if (bloqueo) {
+    bloqueo.style.display = 'flex';
+    // Borramos datos locales para que no pueda saltarse el bloqueo recargando
+    localStorage.removeItem('partidaTesoro');
+  }
+}
+
+async function verificarCodigo() {
+  const btn = document.querySelector('#vista-login button.btn-dark');
+  const inputCodigo = document.getElementById('input-codigo').value;
+  
+  btn.disabled = true;
+  btn.innerText = "VERIFICANDO...";
+
+  // Pasamos el color para que el servidor pueda verificar si ese equipo ya terminó
+  const res = await llamarAPI({ action: 'login', color: colorGlobal, codigo: inputCodigo });
+  
+  if(res && res.exito) {
+    estacionActual = res.estacionObjetivo; 
+    datosJuegoLocal = res.datosJuego; 
+    document.getElementById('texto-pista').innerText = res.pistaInicial;
+    actualizarBarraUI(); 
+    guardar(res.pistaInicial); 
+    irAVista('vista-juego'); 
+    mostrarPantallaJuego('pista');
+  } else { 
+    // Si no fue por juegoFinalizado (bloqueado por llamarAPI), mostrar error de código
+    if(!res.juegoFinalizado) {
+      mostrarAlerta("CÓDIGO INCORRECTO O EQUIPO BLOQUEADO"); 
+    }
+  }
+  
+  btn.disabled = false;
+  btn.innerText = "CONTINUAR";
 }
 
 /* =========================================
