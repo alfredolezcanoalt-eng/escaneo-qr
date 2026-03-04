@@ -1,3 +1,7 @@
+/* =========================================
+   CONFIGURACIÓN Y VARIABLES GLOBALES
+   ========================================= */
+// Reemplaza esta URL con la URL de tu aplicación web de Google Apps Script
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwnBwd-BrpYzVc_u6PZnLNPHVzuvLiBzSP-xL0ZXnKEYDijw78fNG-F2vslKp21lJ4D/exec"; 
 
 let colorGlobal = "", colorBG = "", colorTXT = "";
@@ -6,7 +10,9 @@ let datosJuegoLocal = {};
 
 window.onload = () => { verificarSesion(); };
 
-// LLAMADA API: Ahora intercepta el estado bloqueado global
+/* =========================================
+   CONEXIÓN CON EL SERVIDOR (API FETCH)
+   ========================================= */
 async function llamarAPI(datos) {
   try {
     const response = await fetch(WEB_APP_URL, {
@@ -14,21 +20,29 @@ async function llamarAPI(datos) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(datos)
     });
-    const res = await response.json();
     
-    // Si el servidor detecta que el juego ya terminó
+    const res = await response.json();
+
+    // Lógica de Bloqueo Crítico
     if (res && res.bloqueado) {
-      mostrarAlerta("🛑 JUEGO FINALIZADO\nUn equipo ya encontró el tesoro. ¡Gracias por participar!");
-      setTimeout(resetSesion, 6000);
-      return { exito: false, bloqueado: true };
+      mostrarAlertaCritica("🛑 ¡DEMASIADO TARDE!\nOtro equipo llegó al tesoro. El juego ha terminado.");
+      return res; // Retornamos para detener flujos
     }
     
     return res;
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error en conexión:", error);
     mostrarAlerta("Error de conexión. Revisa tu internet.");
-    return { exito: false };
+    return { exito: false, error: error.message };
   }
+}
+
+/* =========================================
+   UTILIDADES Y ESTADO DEL JUEGO
+   ========================================= */
+function limpiarTextoLocal(texto) {
+  if (!texto) return "";
+  return texto.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
 function mostrarAlerta(msg) { 
@@ -40,7 +54,30 @@ function cerrarAlerta() {
   document.getElementById('mi-alerta').style.display = 'none'; 
 }
 
+// NUEVA FUNCIÓN: Alerta que no se puede cerrar
+function mostrarAlertaCritica(msg) {
+  const modal = document.getElementById('mi-alerta');
+  const btnCerrar = modal.querySelector('button');
+  
+  document.getElementById('alerta-mensaje').innerText = msg;
+  
+  // Escondemos el botón para que no puedan salir
+  if (btnCerrar) btnCerrar.style.display = 'none';
+  
+  modal.style.display = 'flex';
+  modal.style.background = 'rgba(0,0,0,0.95)'; // Oscurecemos más el fondo
+  
+  // Bloqueamos el reinicio de sesión automático
+  localStorage.setItem('JUEGO_BLOQUEADO', 'true');
+}
+
 function verificarSesion() {
+  // Validación de Bloqueo Permanente
+  if (localStorage.getItem('JUEGO_BLOQUEADO')) {
+    mostrarAlertaCritica("🛑 ¡DEMASIADO TARDE!\nOtro equipo llegó al tesoro. El juego ha terminado.");
+    return;
+  }
+
   const guardado = localStorage.getItem('partidaTesoro');
   if (guardado) {
     const d = JSON.parse(guardado);
@@ -71,28 +108,45 @@ function guardar(p) {
 
 function resetSesion() { 
   localStorage.removeItem('partidaTesoro'); 
+  // Opcional: limpiar también el bloqueo si quieres que puedan reiniciar
+  // localStorage.removeItem('JUEGO_BLOQUEADO'); 
   location.reload(); 
 }
 
 function confirmarReinicio() { 
-  if(confirm("⚠️ ¿Deseas salir?")) resetSesion(); 
+  if(confirm("⚠️ ¿ESTÁS SEGURO DE QUE DESEAS SALIR?\n\nSi reinicias, tendrás que volver a ingresar el código de acceso de tu equipo.")) {
+    resetSesion(); 
+  }
 }
 
+/* =========================================
+   VISTAS Y FLUJO DE USUARIO
+   ========================================= */
 async function cargarEquipos() {
   const cont = document.getElementById('contenedor-botones');
+  cont.innerHTML = "<p class='text-white text-center w-100 mt-5 fw-bold'>Cargando equipos...</p>";
+  
   const equipos = await llamarAPI({ action: 'getTeams' });
+  
   if(equipos && Array.isArray(equipos)) {
-    const confs = {"ROJO":{bg:"#FF0000",txt:"#FFF"},"LILA":{bg:"#C8A2C8",txt:"#000"},"BLANCO":{bg:"#FFF",txt:"#000"},"AMARILLO":{bg:"#FFD700",txt:"#000"},"NARANJA":{bg:"#FF8C00",txt:"#FFF"},"CELESTE":{bg:"#00BFFF",txt:"#000"},"VERDE":{bg:"#008000",txt:"#FFF"},"MARRON":{bg:"#8B4513",txt:"#FFF"}};
+    const confs = {
+      "ROJO":{bg:"#FF0000",txt:"#FFF"},"LILA":{bg:"#C8A2C8",txt:"#000"},"BLANCO":{bg:"#FFF",txt:"#000"},
+      "AMARILLO":{bg:"#FFD700",txt:"#000"},"NARANJA":{bg:"#FF8C00",txt:"#FFF"},"CELESTE":{bg:"#00BFFF",txt:"#000"},
+      "VERDE":{bg:"#008000",txt:"#FFF"},"MARRON":{bg:"#8B4513",txt:"#FFF"}
+    };
     cont.innerHTML = "";
     equipos.forEach(c => {
       const f = confs[c] || {bg:c,txt:"#FFF"};
       const btn = document.createElement('button');
       btn.className = 'btn btn-equipo-gigante';
-      btn.style.backgroundColor = f.bg; btn.style.color = f.txt;
+      btn.style.backgroundColor = f.bg; 
+      btn.style.color = f.txt;
       btn.innerText = c;
       btn.onclick = () => loginEquipo(c, f.bg, f.txt);
       cont.appendChild(btn);
     });
+  } else {
+    cont.innerHTML = "<p class='text-danger text-center w-100 mt-5 fw-bold'>Error al cargar. Recarga la página.</p>";
   }
 }
 
@@ -106,107 +160,205 @@ function loginEquipo(c, bg, txt) {
 }
 
 function aplicarEstilos() { 
-  document.getElementById('cuerpo-web').style.background = `radial-gradient(circle at top, color-mix(in srgb, ${colorBG} 85%, transparent) 0%, #1a1a1a 100%)`;
+  const bgElement = document.getElementById('cuerpo-web');
+  bgElement.style.background = `radial-gradient(circle at top, color-mix(in srgb, ${colorBG} 85%, transparent) 0%, #1a1a1a 100%)`;
+  bgElement.style.minHeight = "100vh";
 }
 
 function actualizarBarraUI() {
   const pct = Math.round((estacionesVisitadas / 8) * 100);
   const barra = document.getElementById('barra-completado');
-  barra.style.width = pct + "%"; barra.innerText = pct + "%";
+  barra.style.width = pct + "%"; 
+  barra.innerText = pct + "%";
   document.getElementById('num-pasos').innerText = estacionesVisitadas;
-  barra.style.backgroundColor = colorBG; barra.style.color = colorTXT;
+  barra.style.backgroundColor = colorBG;
+  barra.style.color = colorTXT;
+  barra.className = "progress-bar progress-bar-striped progress-bar-animated fw-bold";
 }
 
 async function verificarCodigo() {
   const btn = document.querySelector('#vista-login button.btn-dark');
-  const codigo = document.getElementById('input-codigo').value;
+  const inputCodigo = document.getElementById('input-codigo').value;
+  
   btn.disabled = true;
-  const res = await llamarAPI({ action: 'login', color: colorGlobal, codigo: codigo });
+  btn.innerText = "VERIFICANDO...";
+
+  const res = await llamarAPI({ action: 'login', color: colorGlobal, codigo: inputCodigo });
+  
   if(res && res.exito) {
-    estacionActual = res.estacionObjetivo; datosJuegoLocal = res.datosJuego; 
+    estacionActual = res.estacionObjetivo; 
+    datosJuegoLocal = res.datosJuego; 
     document.getElementById('texto-pista').innerText = res.pistaInicial;
-    actualizarBarraUI(); guardar(res.pistaInicial); 
-    irAVista('vista-juego'); mostrarPantallaJuego('pista');
+    actualizarBarraUI(); 
+    guardar(res.pistaInicial); 
+    irAVista('vista-juego'); 
+    mostrarPantallaJuego('pista');
+    
+    // Solicitar permisos de GPS anticipadamente de forma silenciosa
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition(()=>{}, ()=>{}, {enableHighAccuracy: true});
-  } else if (!res.bloqueado) { mostrarAlerta("CÓDIGO INCORRECTO"); }
+  } else if (res && !res.bloqueado) { 
+    mostrarAlerta("CÓDIGO INCORRECTO"); 
+  }
+  
   btn.disabled = false;
+  btn.innerText = "CONTINUAR";
 }
 
+/* =========================================
+   MÓDULO DE CÁMARA Y GPS
+   ========================================= */
 function abrirEscaner() {
   const icon = document.querySelector('.icon-cam');
-  icon.innerText = "⏳";
+  icon.innerText = "⏳"; // Muestra reloj de arena mientras capta GPS
+  const opcionesGps = { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 };
+
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      (p) => { icon.innerText = "📷"; iniciarCamara(p.coords.latitude, p.coords.longitude); },
-      () => { icon.innerText = "📷"; iniciarCamara(null, null); }, 
-      { enableHighAccuracy: true, timeout: 5000 }
+      (position) => {
+        icon.innerText = "📷";
+        iniciarCamara(position.coords.latitude, position.coords.longitude);
+      },
+      (error) => {
+        console.warn("GPS falló:", error);
+        icon.innerText = "📷";
+        iniciarCamara(null, null);
+      }, 
+      opcionesGps
     );
-  } else { iniciarCamara(null, null); }
+  } else {
+    icon.innerText = "📷";
+    iniciarCamara(null, null);
+  }
 }
 
 function iniciarCamara(lat, lon) {
   irAVista('vista-qr');
   html5QrCode = new Html5Qrcode("reader");
   html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (txt) => {
+    
+    // Validación local directa
     if(txt.trim() === estacionActual.toString().trim()) { 
       cerrarEscaner(); 
-      const res = await llamarAPI({ action: 'scan', color: colorGlobal, estacion: estacionActual, lat: lat, lon: lon, paso: estacionesVisitadas + 1 });
-      if (res && res.bloqueado) return;
+      let pasoActual = estacionesVisitadas + 1;
+
+      // Enviar reporte de llegada al servidor en segundo plano
+      let scanRes;
+      if (lat !== null) {
+        scanRes = await llamarAPI({ action: 'scan', color: colorGlobal, estacion: estacionActual, lat: lat, lon: lon, paso: pasoActual });
+      } else {
+        scanRes = await llamarAPI({ action: 'scan', color: colorGlobal, paso: pasoActual });
+      }
+      
+      // Si está bloqueado, no mostramos el acertijo
+      if (scanRes && scanRes.bloqueado) return;
+
+      document.getElementById('error-respuesta').style.display = 'none';
       document.getElementById('texto-acertijo').innerText = datosJuegoLocal[estacionActual].acertijo;
       mostrarPantallaJuego('acertijo');
-    } else { mostrarAlerta("QR INCORRECTO"); cerrarEscaner(); }
-  }).catch(() => { cerrarEscaner(); });
+    } else { 
+      mostrarAlerta("QR INCORRECTO.\nVerifica que sea el QR correcto"); 
+      cerrarEscaner(); 
+    }
+  }).catch(() => { 
+    mostrarAlerta("ERROR DE CÁMARA. Asegúrate de dar permisos en el navegador."); 
+    cerrarEscaner();
+  });
 }
 
 function cerrarEscaner() { 
-  if(html5QrCode) { html5QrCode.stop().then(() => irAVista('vista-juego')).catch(() => irAVista('vista-juego')); }
-  else { irAVista('vista-juego'); }
+  if(html5QrCode) {
+    html5QrCode.stop().then(() => irAVista('vista-juego')).catch(() => irAVista('vista-juego')); 
+  } else {
+    irAVista('vista-juego');
+  }
 }
 
+/* =========================================
+   RESOLUCIÓN DE ACERTIJOS Y FINAL
+   ========================================= */
 async function enviarRespuesta() {
   const input = document.getElementById('input-respuesta');
-  const resp = input.value.toString().toUpperCase().trim();
-  if (resp === datosJuegoLocal[estacionActual].respuesta) {
-    const res = await llamarAPI({ action: 'answer', color: colorGlobal, estacion: estacionActual, respuesta: resp, paso: estacionesVisitadas + 1 });
+  const respuestaUsuario = limpiarTextoLocal(input.value);
+  const respuestaCorrecta = datosJuegoLocal[estacionActual].respuesta;
+
+  document.getElementById('error-respuesta').style.display = 'none';
+
+  if (respuestaUsuario === respuestaCorrecta) {
+    document.getElementById('btn-enviar-respuesta').style.display = 'none';
+    let pasoActual = estacionesVisitadas + 1;
+    
+    // Registrar respuesta en el servidor
+    const res = await llamarAPI({ action: 'answer', color: colorGlobal, estacion: estacionActual, respuesta: input.value, paso: pasoActual });
+    
+    // Si la respuesta indica bloqueo, detenemos la ejecución
     if (res && res.bloqueado) return;
-    estacionesVisitadas++; actualizarBarraUI();
+    
+    estacionesVisitadas++; 
+    actualizarBarraUI();
+    document.getElementById('btn-enviar-respuesta').style.display = 'block'; 
+    
     if(estacionesVisitadas >= 8) {
-      const pF = datosJuegoLocal[estacionActual].pistaSiguiente;
-      document.getElementById('pista-tesoro-final').innerText = pF;
-      mostrarPantallaJuego('tesoro'); guardar(pF);
+      mostrarPantallaJuego('tesoro'); 
+      const pistaFinal = datosJuegoLocal[estacionActual].pistaSiguiente;
+      document.getElementById('pista-tesoro-final').innerText = pistaFinal;
+      document.getElementById('cuerpo-web').style.background = "radial-gradient(circle at center, #2d1b0d 0%, #000 100%)"; 
+      guardar(pistaFinal);
     } else {
-      const pS = datosJuegoLocal[estacionActual].pistaSiguiente;
-      estacionActual = datosJuegoLocal[estacionActual].proximoQR;
-      document.getElementById('texto-pista').innerText = pS;
-      input.value = ""; mostrarPantallaJuego('pista'); guardar(pS);
+      const pistaSig = datosJuegoLocal[estacionActual].pistaSiguiente;
+      const proximoQR = datosJuegoLocal[estacionActual].proximoQR;
+      
+      estacionActual = proximoQR; 
+      document.getElementById('texto-pista').innerText = pistaSig;
+      input.value = ""; 
+      mostrarPantallaJuego('pista'); 
+      guardar(pistaSig);
     }
-  } else { document.getElementById('error-respuesta').style.display = 'block'; }
+  } else { 
+    document.getElementById('error-respuesta').style.display = 'block'; 
+  }
 }
 
-async function procesarFoto() {
+function procesarFoto() {
   const file = document.getElementById('foto-tesoro').files[0];
   if(!file) return;
   const reader = new FileReader();
-  document.getElementById('status-foto').innerText = "SUBIENDO...";
+  document.getElementById('status-foto').innerText = "SUBIENDO EVIDENCIA... (Esto puede tomar unos segundos)";
+  
   reader.onload = async (e) => {
-    const res = await llamarAPI({ action: 'uploadPhoto', base64: e.target.result, color: colorGlobal });
-    if(res && res.exito) { mostrarAlerta("¡LOGRADO!"); setTimeout(resetSesion, 4000); }
+    const base64Str = e.target.result;
+    const res = await llamarAPI({ action: 'uploadPhoto', base64: base64Str, color: colorGlobal });
+    
+    if(res && res.exito) { 
+      mostrarAlerta("¡FOTO GUARDADA CON ÉXITO!\nDiríjanse a la base."); 
+      setTimeout(resetSesion, 5000); 
+    } else if (res && !res.bloqueado) {
+      mostrarAlerta("Error al guardar la foto. Intenta de nuevo.");
+      document.getElementById('status-foto').innerText = "";
+    }
   };
   reader.readAsDataURL(file);
 }
 
+/* =========================================
+   NAVEGACIÓN INTERNA
+   ========================================= */
 function irAVista(id) { 
-  ['vista-equipos', 'vista-login', 'vista-juego', 'vista-qr'].forEach(v => { document.getElementById(v).style.display = (v == id) ? 'block' : 'none'; });
+  ['vista-equipos', 'vista-login', 'vista-juego', 'vista-qr'].forEach(v => { 
+    document.getElementById(v).style.display = (v == id) ? 'block' : 'none'; 
+  }); 
   actualizarBotonQR(); 
 }
 
-function mostrarPantallaJuego(p) {
-  ['pantalla-pista', 'pantalla-acertijo', 'pantalla-tesoro'].forEach(x => { document.getElementById(x).style.display = (x === 'pantalla-'+p) ? 'block' : 'none'; });
-  if(p==='pista') document.getElementById('pantalla-pista').style.display = 'flex';
+function mostrarPantallaJuego(pantalla) {
+  ['pantalla-pista', 'pantalla-acertijo', 'pantalla-tesoro'].forEach(p => { 
+    document.getElementById(p).style.display = (p === 'pantalla-'+pantalla) ? 'block' : 'none'; 
+  });
+  if(pantalla==='pista') document.getElementById('pantalla-pista').style.display = 'flex';
   actualizarBotonQR();
 }
 
 function actualizarBotonQR() {
-  const enP = document.getElementById('pantalla-pista').style.display !== 'none';
-  document.getElementById('contenedor-escanear-fijo').style.display = (estacionesVisitadas < 8 && enP && document.getElementById('vista-juego').style.display !== 'none') ? 'block' : 'none';
+  const enPista = document.getElementById('pantalla-pista').style.display !== 'none';
+  document.getElementById('contenedor-escanear-fijo').style.display = 
+    (estacionesVisitadas < 8 && enPista && document.getElementById('vista-juego').style.display !== 'none') ? 'block' : 'none';
 }
