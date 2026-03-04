@@ -1,7 +1,6 @@
 /* =========================================
    CONFIGURACIÓN Y VARIABLES GLOBALES
    ========================================= */
-// Reemplaza esta URL con la URL de tu aplicación web de Google Apps Script
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwnBwd-BrpYzVc_u6PZnLNPHVzuvLiBzSP-xL0ZXnKEYDijw78fNG-F2vslKp21lJ4D/exec"; 
 
 let colorGlobal = "", colorBG = "", colorTXT = "";
@@ -17,11 +16,19 @@ async function llamarAPI(datos) {
   try {
     const response = await fetch(WEB_APP_URL, {
       method: 'POST',
-      // Usamos text/plain para evitar bloqueos CORS por preflight (OPTIONS) en Google Apps Script
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(datos)
     });
-    return await response.json();
+    const res = await response.json();
+
+    // Lógica de Bloqueo Global 3.02: Si el servidor dice que el juego terminó
+    if (res && res.bloqueado) {
+      mostrarAlerta("🛑 JUEGO FINALIZADO\nUn equipo ya encontró el tesoro. ¡Gracias por participar!");
+      setTimeout(resetSesion, 7000);
+      return res;
+    }
+
+    return res;
   } catch (error) {
     console.error("Error en conexión:", error);
     mostrarAlerta("Error de conexión. Revisa tu internet.");
@@ -161,9 +168,8 @@ async function verificarCodigo() {
     irAVista('vista-juego'); 
     mostrarPantallaJuego('pista');
     
-    // Solicitar permisos de GPS anticipadamente de forma silenciosa
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition(()=>{}, ()=>{}, {enableHighAccuracy: true});
-  } else { 
+  } else if (res && !res.bloqueado) { 
     mostrarAlerta("CÓDIGO INCORRECTO"); 
   }
   
@@ -176,7 +182,7 @@ async function verificarCodigo() {
    ========================================= */
 function abrirEscaner() {
   const icon = document.querySelector('.icon-cam');
-  icon.innerText = "⏳"; // Muestra reloj de arena mientras capta GPS
+  icon.innerText = "⏳"; 
   const opcionesGps = { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 };
 
   if (navigator.geolocation) {
@@ -201,20 +207,24 @@ function abrirEscaner() {
 function iniciarCamara(lat, lon) {
   irAVista('vista-qr');
   html5QrCode = new Html5Qrcode("reader");
-  html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
+  html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (txt) => {
     
-    // Validación local directa
     if(txt.trim() === estacionActual.toString().trim()) { 
       cerrarEscaner(); 
       let pasoActual = estacionesVisitadas + 1;
 
-      // Enviar reporte de llegada al servidor en segundo plano
-      if (lat !== null) {
-        llamarAPI({ action: 'scan', color: colorGlobal, estacion: estacionActual, lat: lat, lon: lon, paso: pasoActual });
-      } else {
-        llamarAPI({ action: 'scan', color: colorGlobal, paso: pasoActual });
-      }
-      
+      // Reporte de llegada (aquí el servidor puede responder con bloqueo)
+      const scanRes = await llamarAPI({ 
+        action: 'scan', 
+        color: colorGlobal, 
+        estacion: estacionActual, 
+        lat: lat, 
+        lon: lon, 
+        paso: pasoActual 
+      });
+
+      if (scanRes && scanRes.bloqueado) return; // Detener flujo si está bloqueado
+
       document.getElementById('error-respuesta').style.display = 'none';
       document.getElementById('texto-acertijo').innerText = datosJuegoLocal[estacionActual].acertijo;
       mostrarPantallaJuego('acertijo');
@@ -239,7 +249,7 @@ function cerrarEscaner() {
 /* =========================================
    RESOLUCIÓN DE ACERTIJOS Y FINAL
    ========================================= */
-function enviarRespuesta() {
+async function enviarRespuesta() {
   const input = document.getElementById('input-respuesta');
   const respuestaUsuario = limpiarTextoLocal(input.value);
   const respuestaCorrecta = datosJuegoLocal[estacionActual].respuesta;
@@ -250,9 +260,16 @@ function enviarRespuesta() {
     document.getElementById('btn-enviar-respuesta').style.display = 'none';
     let pasoActual = estacionesVisitadas + 1;
     
-    // Registrar respuesta en el servidor en segundo plano
-    llamarAPI({ action: 'answer', color: colorGlobal, estacion: estacionActual, respuesta: input.value, paso: pasoActual });
-    
+    const res = await llamarAPI({ 
+      action: 'answer', 
+      color: colorGlobal, 
+      estacion: estacionActual, 
+      respuesta: input.value, 
+      paso: pasoActual 
+    });
+
+    if (res && res.bloqueado) return; // Detener si está bloqueado
+
     estacionesVisitadas++; 
     actualizarBarraUI();
     document.getElementById('btn-enviar-respuesta').style.display = 'block'; 
@@ -291,7 +308,7 @@ function procesarFoto() {
     if(res && res.exito) { 
       mostrarAlerta("¡FOTO GUARDADA CON ÉXITO!\nDiríjanse a la base."); 
       setTimeout(resetSesion, 5000); 
-    } else {
+    } else if (res && !res.bloqueado) {
       mostrarAlerta("Error al guardar la foto. Intenta de nuevo.");
       document.getElementById('status-foto').innerText = "";
     }
