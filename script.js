@@ -17,19 +17,11 @@ async function llamarAPI(datos) {
   try {
     const response = await fetch(WEB_APP_URL, {
       method: 'POST',
+      // Usamos text/plain para evitar bloqueos CORS por preflight (OPTIONS) en Google Apps Script
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(datos)
     });
-    
-    const res = await response.json();
-
-    // Lógica de Bloqueo Crítico
-    if (res && res.bloqueado) {
-      mostrarAlertaCritica("🛑 ¡DEMASIADO TARDE!\nOtro equipo llegó al tesoro. El juego ha terminado.");
-      return res; // Retornamos para detener flujos
-    }
-    
-    return res;
+    return await response.json();
   } catch (error) {
     console.error("Error en conexión:", error);
     mostrarAlerta("Error de conexión. Revisa tu internet.");
@@ -54,30 +46,7 @@ function cerrarAlerta() {
   document.getElementById('mi-alerta').style.display = 'none'; 
 }
 
-// NUEVA FUNCIÓN: Alerta que no se puede cerrar
-function mostrarAlertaCritica(msg) {
-  const modal = document.getElementById('mi-alerta');
-  const btnCerrar = modal.querySelector('button');
-  
-  document.getElementById('alerta-mensaje').innerText = msg;
-  
-  // Escondemos el botón para que no puedan salir
-  if (btnCerrar) btnCerrar.style.display = 'none';
-  
-  modal.style.display = 'flex';
-  modal.style.background = 'rgba(0,0,0,0.95)'; // Oscurecemos más el fondo
-  
-  // Bloqueamos el reinicio de sesión automático
-  localStorage.setItem('JUEGO_BLOQUEADO', 'true');
-}
-
 function verificarSesion() {
-  // Validación de Bloqueo Permanente
-  if (localStorage.getItem('JUEGO_BLOQUEADO')) {
-    mostrarAlertaCritica("🛑 ¡DEMASIADO TARDE!\nOtro equipo llegó al tesoro. El juego ha terminado.");
-    return;
-  }
-
   const guardado = localStorage.getItem('partidaTesoro');
   if (guardado) {
     const d = JSON.parse(guardado);
@@ -108,8 +77,6 @@ function guardar(p) {
 
 function resetSesion() { 
   localStorage.removeItem('partidaTesoro'); 
-  // Opcional: limpiar también el bloqueo si quieres que puedan reiniciar
-  // localStorage.removeItem('JUEGO_BLOQUEADO'); 
   location.reload(); 
 }
 
@@ -196,7 +163,7 @@ async function verificarCodigo() {
     
     // Solicitar permisos de GPS anticipadamente de forma silenciosa
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition(()=>{}, ()=>{}, {enableHighAccuracy: true});
-  } else if (res && !res.bloqueado) { 
+  } else { 
     mostrarAlerta("CÓDIGO INCORRECTO"); 
   }
   
@@ -234,7 +201,7 @@ function abrirEscaner() {
 function iniciarCamara(lat, lon) {
   irAVista('vista-qr');
   html5QrCode = new Html5Qrcode("reader");
-  html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (txt) => {
+  html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
     
     // Validación local directa
     if(txt.trim() === estacionActual.toString().trim()) { 
@@ -242,16 +209,12 @@ function iniciarCamara(lat, lon) {
       let pasoActual = estacionesVisitadas + 1;
 
       // Enviar reporte de llegada al servidor en segundo plano
-      let scanRes;
       if (lat !== null) {
-        scanRes = await llamarAPI({ action: 'scan', color: colorGlobal, estacion: estacionActual, lat: lat, lon: lon, paso: pasoActual });
+        llamarAPI({ action: 'scan', color: colorGlobal, estacion: estacionActual, lat: lat, lon: lon, paso: pasoActual });
       } else {
-        scanRes = await llamarAPI({ action: 'scan', color: colorGlobal, paso: pasoActual });
+        llamarAPI({ action: 'scan', color: colorGlobal, paso: pasoActual });
       }
       
-      // Si está bloqueado, no mostramos el acertijo
-      if (scanRes && scanRes.bloqueado) return;
-
       document.getElementById('error-respuesta').style.display = 'none';
       document.getElementById('texto-acertijo').innerText = datosJuegoLocal[estacionActual].acertijo;
       mostrarPantallaJuego('acertijo');
@@ -276,7 +239,7 @@ function cerrarEscaner() {
 /* =========================================
    RESOLUCIÓN DE ACERTIJOS Y FINAL
    ========================================= */
-async function enviarRespuesta() {
+function enviarRespuesta() {
   const input = document.getElementById('input-respuesta');
   const respuestaUsuario = limpiarTextoLocal(input.value);
   const respuestaCorrecta = datosJuegoLocal[estacionActual].respuesta;
@@ -287,11 +250,8 @@ async function enviarRespuesta() {
     document.getElementById('btn-enviar-respuesta').style.display = 'none';
     let pasoActual = estacionesVisitadas + 1;
     
-    // Registrar respuesta en el servidor
-    const res = await llamarAPI({ action: 'answer', color: colorGlobal, estacion: estacionActual, respuesta: input.value, paso: pasoActual });
-    
-    // Si la respuesta indica bloqueo, detenemos la ejecución
-    if (res && res.bloqueado) return;
+    // Registrar respuesta en el servidor en segundo plano
+    llamarAPI({ action: 'answer', color: colorGlobal, estacion: estacionActual, respuesta: input.value, paso: pasoActual });
     
     estacionesVisitadas++; 
     actualizarBarraUI();
@@ -331,7 +291,7 @@ function procesarFoto() {
     if(res && res.exito) { 
       mostrarAlerta("¡FOTO GUARDADA CON ÉXITO!\nDiríjanse a la base."); 
       setTimeout(resetSesion, 5000); 
-    } else if (res && !res.bloqueado) {
+    } else {
       mostrarAlerta("Error al guardar la foto. Intenta de nuevo.");
       document.getElementById('status-foto').innerText = "";
     }
