@@ -20,11 +20,27 @@ async function llamarAPI(datos) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(datos)
     });
-    return await response.json();
+    
+    const jsonRespuesta = await response.json();
+    
+    // --- NUEVO: INTERCEPTOR DE BLOQUEO GLOBAL ---
+    // Si el servidor nos avisa que el juego terminó, disparamos la pantalla de bloqueo
+    if (jsonRespuesta.juegoFinalizado) {
+      bloquearJuegoFinalizado();
+    }
+    // --------------------------------------------
+
+    return jsonRespuesta;
   } catch (error) {
     console.error("Error en conexión:", error);
+    // No mostramos alerta intrusiva si falla en background para no interrumpir el flujo optimista
     return { exito: false, error: error.message };
   }
+}
+
+// --- NUEVO: FUNCIÓN PARA BLOQUEAR UI ---
+function bloquearJuegoFinalizado() {
+  document.getElementById('pantalla-bloqueo-global').style.display = 'flex';
 }
 
 /* =========================================
@@ -151,12 +167,6 @@ async function verificarCodigo() {
   const res = await llamarAPI({ action: 'login', color: colorGlobal, codigo: inputCodigo });
   
   if(res && res.exito) {
-    if(res.juegoPausado) {
-      mostrarAlerta("El juego está pausado actualmente. Espera la señal del staff.");
-      btn.disabled = false;
-      btn.innerText = "CONTINUAR";
-      return;
-    }
     estacionActual = res.estacionObjetivo; 
     datosJuegoLocal = res.datosJuego; 
     document.getElementById('texto-pista').innerText = res.pistaInicial;
@@ -165,9 +175,10 @@ async function verificarCodigo() {
     irAVista('vista-juego'); 
     mostrarPantallaJuego('pista');
     
+    // Solicitar permisos de GPS anticipadamente de forma silenciosa
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition(()=>{}, ()=>{}, {enableHighAccuracy: true});
   } else { 
-    mostrarAlerta("CÓDIGO INCORRECTO"); 
+    if(!res.juegoFinalizado) mostrarAlerta("CÓDIGO INCORRECTO"); 
   }
   
   btn.disabled = false;
@@ -175,11 +186,11 @@ async function verificarCodigo() {
 }
 
 /* =========================================
-   MÓDULO DE CÁMARA Y GPS (OPTIMIZADO)
+   MÓDULO DE CÁMARA Y GPS
    ========================================= */
 function abrirEscaner() {
   const icon = document.querySelector('.icon-cam');
-  icon.innerText = "⏳";
+  icon.innerText = "⏳"; // Muestra reloj de arena mientras capta GPS
   const opcionesGps = { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 };
 
   if (navigator.geolocation) {
@@ -206,24 +217,22 @@ function iniciarCamara(lat, lon) {
   html5QrCode = new Html5Qrcode("reader");
   html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (txt) => {
     
-    // VALIDACIÓN INSTANTÁNEA LOCAL
+    // ⚡ LÓGICA ASÍNCRONA/OPTIMISTA: Verificamos localmente y avanzamos sin esperar
     if(txt.trim() === estacionActual.toString().trim()) { 
       cerrarEscaner(); 
       let pasoActual = estacionesVisitadas + 1;
+
+      // Disparamos la escritura al servidor de fondo (Fire and Forget)
+      if (lat !== null) {
+        llamarAPI({ action: 'scan', color: colorGlobal, estacion: estacionActual, lat: lat, lon: lon, paso: pasoActual });
+      } else {
+        llamarAPI({ action: 'scan', color: colorGlobal, paso: pasoActual });
+      }
       
-      // Mostrar acertijo inmediatamente
+      // Avanzamos en la interfaz instantáneamente
       document.getElementById('error-respuesta').style.display = 'none';
       document.getElementById('texto-acertijo').innerText = datosJuegoLocal[estacionActual].acertijo;
       mostrarPantallaJuego('acertijo');
-
-      // Enviar reporte de llegada al servidor en segundo plano
-      let payload = { action: 'scan', color: colorGlobal, estacion: estacionActual, paso: pasoActual };
-      if (lat !== null) { payload.lat = lat; payload.lon = lon; }
-      
-      llamarAPI(payload).then(res => {
-         if(res && res.juegoPausado) mostrarAlerta("Atención: El staff ha pausado el juego.");
-      });
-
     } else { 
       mostrarAlerta("QR INCORRECTO.\nVerifica que sea el QR correcto"); 
       cerrarEscaner(); 
@@ -243,46 +252,44 @@ function cerrarEscaner() {
 }
 
 /* =========================================
-   RESOLUCIÓN DE ACERTIJOS Y FINAL (OPTIMIZADO)
+   RESOLUCIÓN DE ACERTIJOS Y FINAL
    ========================================= */
 function enviarRespuesta() {
   const input = document.getElementById('input-respuesta');
   const respuestaUsuario = limpiarTextoLocal(input.value);
-  const infoEstacion = datosJuegoLocal[estacionActual];
+  const respuestaCorrecta = datosJuegoLocal[estacionActual].respuesta;
 
   document.getElementById('error-respuesta').style.display = 'none';
 
-  // VALIDACIÓN INSTANTÁNEA LOCAL
-  if (respuestaUsuario === infoEstacion.respuesta) {
+  // ⚡ LÓGICA ASÍNCRONA/OPTIMISTA: Comprobación local inmediata
+  if (respuestaUsuario === respuestaCorrecta) {
     document.getElementById('btn-enviar-respuesta').style.display = 'none';
     let pasoActual = estacionesVisitadas + 1;
-    const pistaSig = infoEstacion.pistaSiguiente;
-    const proximoQR = infoEstacion.proximoQR;
     
-    // Avanzar UI inmediatamente
+    // Sincronizamos con el servidor en segundo plano
+    llamarAPI({ action: 'answer', color: colorGlobal, estacion: estacionActual, respuesta: input.value, paso: pasoActual });
+    
+    // UI reacciona instantáneamente
     estacionesVisitadas++; 
     actualizarBarraUI();
     document.getElementById('btn-enviar-respuesta').style.display = 'block'; 
     
     if(estacionesVisitadas >= 8) {
       mostrarPantallaJuego('tesoro'); 
-      document.getElementById('pista-tesoro-final').innerText = pistaSig;
+      const pistaFinal = datosJuegoLocal[estacionActual].pistaSiguiente;
+      document.getElementById('pista-tesoro-final').innerText = pistaFinal;
       document.getElementById('cuerpo-web').style.background = "radial-gradient(circle at center, #2d1b0d 0%, #000 100%)"; 
-      guardar(pistaSig);
+      guardar(pistaFinal);
     } else {
+      const pistaSig = datosJuegoLocal[estacionActual].pistaSiguiente;
+      const proximoQR = datosJuegoLocal[estacionActual].proximoQR;
+      
       estacionActual = proximoQR; 
       document.getElementById('texto-pista').innerText = pistaSig;
       input.value = ""; 
       mostrarPantallaJuego('pista'); 
       guardar(pistaSig);
     }
-
-    // Registrar respuesta en el servidor en segundo plano
-    llamarAPI({ action: 'answer', color: colorGlobal, estacion: infoEstacion.id_original || estacionActual, respuesta: input.value, paso: pasoActual })
-      .then(res => {
-         if(res && res.juegoPausado) mostrarAlerta("Atención: El staff ha pausado el juego.");
-      });
-
   } else { 
     document.getElementById('error-respuesta').style.display = 'block'; 
   }
@@ -301,7 +308,7 @@ function procesarFoto() {
     if(res && res.exito) { 
       mostrarAlerta("¡FOTO GUARDADA CON ÉXITO!\nDiríjanse a la base."); 
       setTimeout(resetSesion, 5000); 
-    } else {
+    } else if (!res.juegoFinalizado) {
       mostrarAlerta("Error al guardar la foto. Intenta de nuevo.");
       document.getElementById('status-foto').innerText = "";
     }
