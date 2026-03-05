@@ -1,8 +1,7 @@
 /* =========================================
    CONFIGURACIÓN Y VARIABLES GLOBALES
    ========================================= */
-// Reemplaza esta URL con la URL de tu aplicación web de Google Apps Script
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwnBwd-BrpYzVc_u6PZnLNPHVzuvLiBzSP-xL0ZXnKEYDijw78fNG-F2vslKp21lJ4D/exec"; 
+ 
 
 let colorGlobal = "", colorBG = "", colorTXT = "";
 let estacionActual = 0, estacionesVisitadas = 0, html5QrCode;
