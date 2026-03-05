@@ -23,7 +23,7 @@ async function llamarAPI(datos) {
     
     const jsonRespuesta = await response.json();
     
-    // Si el servidor detecta que el equipo terminó o el juego cerró
+    // Si el servidor indica que el juego terminó, activamos el bloqueo visual
     if (jsonRespuesta.juegoFinalizado) {
       bloquearJuegoFinalizado();
       return { exito: false, juegoFinalizado: true }; 
@@ -37,11 +37,10 @@ async function llamarAPI(datos) {
 }
 
 function bloquearJuegoFinalizado() {
-  // Aseguramos que la pantalla de bloqueo sea visible y cubra todo
   const bloqueo = document.getElementById('pantalla-bloqueo-global');
   if (bloqueo) {
     bloqueo.style.display = 'flex';
-    // Borramos datos locales para que no pueda saltarse el bloqueo recargando
+    // Limpiamos los datos locales para evitar que intenten saltar el bloqueo recargando
     localStorage.removeItem('partidaTesoro');
   }
 }
