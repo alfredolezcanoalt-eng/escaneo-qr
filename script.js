@@ -23,7 +23,7 @@ async function llamarAPI(datos) {
     
     const jsonRespuesta = await response.json();
     
-    // Si el servidor indica que el juego terminó, activamos el bloqueo visual
+    // Si el servidor detecta que el equipo terminó o el juego cerró
     if (jsonRespuesta.juegoFinalizado) {
       bloquearJuegoFinalizado();
       return { exito: false, juegoFinalizado: true }; 
@@ -37,10 +37,11 @@ async function llamarAPI(datos) {
 }
 
 function bloquearJuegoFinalizado() {
+  // Aseguramos que la pantalla de bloqueo sea visible y cubra todo
   const bloqueo = document.getElementById('pantalla-bloqueo-global');
   if (bloqueo) {
     bloqueo.style.display = 'flex';
-    // Limpiamos los datos locales para evitar que intenten saltar el bloqueo recargando
+    // Borramos datos locales para que no pueda saltarse el bloqueo recargando
     localStorage.removeItem('partidaTesoro');
   }
 }
@@ -52,14 +53,22 @@ async function verificarCodigo() {
   btn.disabled = true;
   btn.innerText = "VERIFICANDO...";
 
+  // Pasamos el color para que el servidor pueda verificar si ese equipo ya terminó
   const res = await llamarAPI({ action: 'login', color: colorGlobal, codigo: inputCodigo });
   
   if(res && res.exito) {
-    // ... (guardar datos y entrar al juego)
+    estacionActual = res.estacionObjetivo; 
+    datosJuegoLocal = res.datosJuego; 
+    document.getElementById('texto-pista').innerText = res.pistaInicial;
+    actualizarBarraUI(); 
+    guardar(res.pistaInicial); 
+    irAVista('vista-juego'); 
+    mostrarPantallaJuego('pista');
   } else { 
-    // Si falla el login después de un reset, borramos el progreso local por seguridad
-    localStorage.removeItem('partidaTesoro');
-    mostrarAlerta("CÓDIGO INCORRECTO O PARTIDA REINICIADA. Reintente."); 
+    // Si no fue por juegoFinalizado (bloqueado por llamarAPI), mostrar error de código
+    if(!res.juegoFinalizado) {
+      mostrarAlerta("CÓDIGO INCORRECTO O EQUIPO BLOQUEADO"); 
+    }
   }
   
   btn.disabled = false;
