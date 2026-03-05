@@ -52,22 +52,14 @@ async function verificarCodigo() {
   btn.disabled = true;
   btn.innerText = "VERIFICANDO...";
 
-  // Pasamos el color para que el servidor pueda verificar si ese equipo ya terminó
   const res = await llamarAPI({ action: 'login', color: colorGlobal, codigo: inputCodigo });
   
   if(res && res.exito) {
-    estacionActual = res.estacionObjetivo; 
-    datosJuegoLocal = res.datosJuego; 
-    document.getElementById('texto-pista').innerText = res.pistaInicial;
-    actualizarBarraUI(); 
-    guardar(res.pistaInicial); 
-    irAVista('vista-juego'); 
-    mostrarPantallaJuego('pista');
+    // ... (guardar datos y entrar al juego)
   } else { 
-    // Si no fue por juegoFinalizado (bloqueado por llamarAPI), mostrar error de código
-    if(!res.juegoFinalizado) {
-      mostrarAlerta("CÓDIGO INCORRECTO O EQUIPO BLOQUEADO"); 
-    }
+    // Si falla el login después de un reset, borramos el progreso local por seguridad
+    localStorage.removeItem('partidaTesoro');
+    mostrarAlerta("CÓDIGO INCORRECTO O PARTIDA REINICIADA. Reintente."); 
   }
   
   btn.disabled = false;
